@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 """
     plots for ATLAS 
-        hadron: pi0
+        hadron: pi0 for deuteron-gold
         y = 1.75
         root(s_NN) = 5.02 TeV
 """
