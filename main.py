@@ -11,10 +11,10 @@ from bk_interpolate_interp2d import N
 class Solve:
 
     def __init__(self, tl):
-        self.sig = 32.  # constant
+        self.sig = 1.  # constant
         self.alpha = 1./137  # FIND VALUE (EM coupling)
         self.e = 1.60217e-19  # Coulomb
-        self.x0 = 10.e-2  # value of x at which evolution starts. (highest experimental value of x included in fit)
+        self.x0 = 0.01  # Bjorken-x, value of x at which evolution starts. (highest experimental value of x included in fit)
         self.q0 = 1.0  # GeV
         """ordering of flavors:
             1. up      -1. antiup
@@ -27,7 +27,7 @@ class Solve:
 
         self.f = [1, 2, 3, 4, 5, 6, -1, -2, -3, -4, -5, -6]  # CHECK VALUES (quark flavors, including charm with mass of 1.5 GeV)
         self.mf = [0.002, 0.0045, 1.270, 0.101, 172, 5., 0.002, 0.0045, 1.270, 0.101, 172, 5.] # * np.full(1, np.power(3.e8,2)) quark masses in GeV
-        self.ef = [2/3, -1/3, 2/3, -1/3, 2/3, -1/3, -2/3, 1/3, -2/3, 1/3, -2/3, 1/3] * np.full(1, self.e)  # CHECK VALUES quark charges
+        self.ef = [2/3, -1/3, 2/3, -1/3, 2/3, -1/3, -2/3, 1/3, -2/3, 1/3, -2/3, 1/3] # * np.full(1, self.e)  # CHECK VALUES quark charges
         self.tl = tl
 
         self.n = N()  # bk interpolated
@@ -42,28 +42,25 @@ class Solve:
         self.r0 = 0.0
 
     # (transverse) wave function for splitting of photon to quark-antiquark dipole
-    def psi_t(self, z, r):
+    def psi_t2(self, z, r):
         coeff = (6 * self.alpha)/(4 * np.power(np.pi, 2))
         sum = 0
 
         for i in range(len(self.f)):   # summing over all flavors
             eta2 = self.eta_squared(z, self.mf[i])
             eta = np.power(eta2, 0.5)
-            k0 = spec.kn(0, eta * r)  # modified Bessel function of the second kind, 0th order (MacDonald's Function)
-            k1 = spec.kn(1, eta * r)  # MacDonald's Function first order
+            k02 = np.power(spec.kn(0, eta * r), 2) # modified Bessel function of the second kind, 0th order (MacDonald's Function)
+            k12 = np.power(spec.kn(1, eta * r), 2)  # MacDonald's Function first order
 
-            t1 = (np.power(z, 2) + np.power(1-z, 2)) * eta2 * np.power(k1, 2)
-            t2 = np.power(self.mf[i], 2) * np.power(k0, 2)
+            t1 = (np.power(z, 2) + np.power(1-z, 2)) * eta2 * k12
+            t2 = np.power(self.mf[i], 2) * k02
 
             sum += np.power(self.ef[i], 2) * (t1 + t2)
 
-            # print("eta2 = " + str(eta2) + ", k0 = " + str(k0) + ", k1 = " + str(k1) + ", t1 = " + str(t1) + ", t2 = " + str(t2))
-
-        # print("psi_t for z = " + str(z) + ", r = " + str(r) + " is: " + str(coeff * sum))
         return coeff * sum
 
     # (longitudinal) wave function for splitting of photon to quark-antiquark dipole
-    def psi_l(self, z, r):
+    def psi_l2(self, z, r):
 
         coeff = (6 * self.alpha) / (4 * np.power(np.pi, 2))
         sum = 0
@@ -71,9 +68,9 @@ class Solve:
         for i in range(len(self.f)):
             eta2 = self.eta_squared(z, self.mf[i])
             eta = np.power(eta2, 0.5)
-            k0 = spec.kn(0, eta * r)
-            sum += np.power(2 * self.ef[i] * z * (1-z) * k0, 2) * self.qsq2
-        
+            k02 = np.power(spec.kn(0, eta * r), 2)
+            a = 4 * self.qsq2 * np.power(z * (1 - z), 2) * k02 * np.power(self.ef[i], 2)
+            sum += a
         return coeff * sum
         
     def eta_squared(self, z, m_f):
@@ -82,12 +79,11 @@ class Solve:
 
     def inner_integral(self, z):
         if self.tl == "T":
-            m = lambda r_: self.psi_t(z, r_) * self.n.master(r_, self.y)
+            m = lambda r_: self.psi_t2(z, r_) * self.n.master(r_, self.y)
         elif self.tl == "L":
-            m = lambda r_: self.psi_l(z, r_) * self.n.master(r_, self.y)
+            m = lambda r_: self.psi_l2(z, r_) * self.n.master(r_, self.y)
 
-        u = intg.quad(m, 0.0, self.r, epsabs=1.e-5)[0]
-        # print("inner integral for r = " + str(self.r0) + " u is: " + str(u))
+        u = intg.quad(m, 0.0, 1/self.qsq2, epsabs=1.e-5)[0]
         return u
 
     def rhs(self, x, qsq2):  # returns F_T, F_L
@@ -98,37 +94,23 @@ class Solve:
 
         self.y = np.log(self.x0/self.x)
         integral = intg.quad(self.inner_integral, 0, 1, epsabs=1.e-5)[0]
-        return (1/np.power(self.r0,2)) * 2 * np.pi * self.sig*integral  # 2*np.pi comes from theta component in the inner double integral. since there is no dependence on theta, multiply it out
+        return 2 * np.pi * self.sig*integral  # 2*np.pi comes from theta component in the inner double integral. since there is no dependence on theta, multiply it out
 
 if __name__ == "__main__":
     alpha = 1/137.
-    # p = []  # p for parameters
-
-    """ order of parameters in parameters.txt:
-        1. transverse/longitudinal momentum """
-    """# reading in values from parameters.txt
-    with open("parameters.txt", "r") as csvfile:
-        reader = csv.reader(csvfile, delimiter="\t")
-        for r in reader:
-            raw = r[0].split()
-            p.append(raw[len(raw)-1])"""
+    c = 2.568  # unit conversion factor
 
     # create new instance of solve class
     st = Solve("T")
     sl = Solve("L")
-    # x = np.logspace(10.e-3, 10.e-3, num=4)
-    x = [10.e-3]
+
+    x = [0.0001, 0.000215443, 0.000464158883, 0.001, 0.00215443469, 0.0046415, 0.01]
     qsq2 = 10.0  # GeV^2
 
-    sig_t = st.rhs(x[0], qsq2)
-    sig_l = sl.rhs(x[0], qsq2)
-
-    f2 = (qsq2/(4 * np.power(np.pi, 2) * alpha)) * (sig_t + sig_l)
-    print("sig_t = " + str(sig_t) + ", sig_l = " + str(sig_l) + ", f2 = " + str(f2))
-
-    print("sig_t = " + str(sig_t))
-    """
+    print(x)
     for i in range(len(x)):
-        a = s.rhs(x[i], qsq2)
-        print("for x = " + str(x[i]) + ", sigma = " + str(a))
-    """
+        sig_t = st.rhs(x[i], qsq2)
+        sig_l = sl.rhs(x[i], qsq2)
+
+        f2 = (qsq2/(4 * np.power(np.pi, 2) * alpha)) * (sig_t + sig_l)
+        print("x = " + str(x[i]) + ", f2 = " + str(f2 * 2.568))
