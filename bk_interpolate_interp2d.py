@@ -22,7 +22,7 @@ class N:
 
 
         # read results.csv file from BK solution to pandas dataframe
-        self.df = pd.read_csv("full_bk_results.csv", sep="\t")
+        self.df = pd.read_csv("results.csv", sep="\t") # results csv has frozen alhpa = 0.7
         self.df.columns = ['kuta', 'y', 'vr', 'vfr', 'prev']
         # self.df = self.df.drop(self.df[self.df.kuta == "kuta"].index)
 

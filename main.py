@@ -16,6 +16,10 @@ class Solve:
         self.e = 1.60217e-19  # Coulomb
         self.x0 = 0.01  # Bjorken-x, value of x at which evolution starts. (highest experimental value of x included in fit)
         self.q0 = 1.0  # GeV
+
+        self.lamb = 0.241  # lambda_QCD (GeV)
+        self.root_sNN = 319 # for data from 1993, s = 4 * Ep * Ee
+
         """ordering of flavors:
             1. up      -1. antiup
             2. down    -2. antidown
@@ -36,7 +40,6 @@ class Solve:
         self.x = 0.0
         self.qsq2 = 0.0
         self.y = 0.0  # rapidity
-        self.lamb = 1.0
 
         self.r = 0.0  # upper bound on integral
         self.r0 = 0.0
@@ -93,19 +96,20 @@ class Solve:
         self.r0 = (1/self.q0) * np.power(self.x/self.x0, self.lamb/2)
 
         self.y = np.log(self.x0/self.x)
+        # self.y = self.qsq2/(np.power(self.root_sNN, 2) * self.x)
         integral = intg.quad(self.inner_integral, 0, 1, epsabs=1.e-5)[0]
         return 2 * np.pi * self.sig*integral  # 2*np.pi comes from theta component in the inner double integral. since there is no dependence on theta, multiply it out
 
 if __name__ == "__main__":
-    alpha = 1/137.
+    alpha = 1/137. #?? HWERE DID HTIS COME FROM
     c = 2.568  # unit conversion factor
 
     # create new instance of solve class
     st = Solve("T")
     sl = Solve("L")
 
-    x = [0.0001, 0.000215443, 0.000464158883, 0.001, 0.00215443469, 0.0046415, 0.01]
-    qsq2 = 10.0  # GeV^2
+    x = [0.00750, 0.01330]
+    qsq2 = 400.0  # GeV^2
 
     print(x)
     for i in range(len(x)):
